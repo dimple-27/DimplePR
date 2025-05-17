@@ -1,75 +1,88 @@
 import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { ActivityIndicator, Animated, Dimensions, Platform, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { fetchPhilosophyData } from '../redux/slices/philosophySlice';
+import { FlatList } from 'react-native-gesture-handler';
+import { RootState, AppDispatch } from '../redux/store';
+import { useSelector, useDispatch } from 'react-redux';
+import VideoItem from '@/components/VideoItem';
+import { VideoView } from 'expo-video';
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
 
 export default function HomeScreen() {
+  const dispatch = useDispatch();
+  const { data, loading, error } = useSelector((state: RootState) => state.philosophy);
+  const [videoList, setVideoList] = useState([]);
+  const videoRefs = useRef<Array<VideoView | null>>([]);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const onPlayPause = () => {
+    setIsPlaying((prev) => !prev);
+  };
+
+  const onMuteToggle = () => {
+    setIsMuted((prev) => !prev);
+  };
+  useEffect(() => {
+    dispatch(fetchPhilosophyData({
+      id: '684ee90a-6498-4c58-a425-bdbe93886eb7',
+      pageSize: 20,
+    }));
+  }, []);
+
+  useEffect(() => {
+    if (data) {
+      setVideoList(data.data.list);
+    }
+  }, [data]);
+
+  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
+    if (viewableItems.length > 0) {
+      const nextIndex = viewableItems[0].index;
+      setCurrentIndex(nextIndex);
+    }
+  }).current;
+
+
+
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
+
+  if (loading || !data) return <ActivityIndicator size="large" />;
+
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    videoList.length > 0 ?
+      <FlatList
+        data={videoList}
+        keyExtractor={(item: any, index) => item.id || index.toString()}
+        pagingEnabled
+        initialNumToRender={1}
+        snapToAlignment='start'
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+        snapToInterval={SCREEN_HEIGHT}
+        renderItem={({ item, index }) => (
+          <View style={{ height: SCREEN_HEIGHT }}>
+            <VideoItem
+              item={item}
+              isPlaying={index === currentIndex && isPlaying}
+              onPlayPause={onPlayPause}
+              isMuted={isMuted}
+              onMuteToggle={onMuteToggle}
+              isCurrent={index === currentIndex}
+            />          
+          </View>
+        )}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+        removeClippedSubviews={Platform.OS === 'android'}  // Enable only for Android to improve performance
+        decelerationRate="fast"
+        maxToRenderPerBatch={3}
+        windowSize={5}
+      /> : null
   );
 }
 
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
